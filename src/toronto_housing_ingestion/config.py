@@ -188,8 +188,7 @@ def load_config(path: Path) -> AppConfig:
     """
     if sys.version_info[:2] != (3, 14):
         raise RuntimeError(
-            "This project requires Python 3.14.x; "
-            f"detected {sys.version.split()[0]}."
+            f"This project requires Python 3.14.x; detected {sys.version.split()[0]}."
         )
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))

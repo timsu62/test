@@ -51,8 +51,12 @@ def test_unknown_source_selection_is_reported_in_cli() -> None:
 
 def test_freshness() -> None:
     now = datetime(2026, 10, 7, tzinfo=UTC)
-    assert ingestion.check_freshness("2026-10-06T12:00:00+00:00", "daily", now) == "fresh"
-    assert ingestion.check_freshness("2026-10-01T12:00:00+00:00", "daily", now) == "stale"
+    assert (
+        ingestion.check_freshness("2026-10-06T12:00:00+00:00", "daily", now) == "fresh"
+    )
+    assert (
+        ingestion.check_freshness("2026-10-01T12:00:00+00:00", "daily", now) == "stale"
+    )
     assert ingestion.check_freshness(None, "daily", now) == "unknown"
 
 
@@ -86,7 +90,9 @@ def test_fallback_tries_next_resource() -> None:
 
 def test_stale_source_is_warning_only() -> None:
     now = datetime(2026, 10, 7, tzinfo=UTC)
-    assert ingestion.check_freshness("2026-10-01T12:00:00+00:00", "daily", now) == "stale"
+    assert (
+        ingestion.check_freshness("2026-10-01T12:00:00+00:00", "daily", now) == "stale"
+    )
 
 
 def test_stale_flag_is_not_a_cli_option() -> None:

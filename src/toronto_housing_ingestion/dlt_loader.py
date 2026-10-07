@@ -139,9 +139,7 @@ def load_scd2(
         columns=source.type_hints,
     )
     if destination_kind == "duckdb":
-        credentials = str(
-            (Path(__file__).resolve().parents[2] / credentials).resolve()
-        )
+        credentials = str((Path(__file__).resolve().parents[2] / credentials).resolve())
 
     pipeline = dlt.pipeline(
         pipeline_name=f"toronto_{source.name}_scd2",

@@ -19,8 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the command-line interface."""
     parser = argparse.ArgumentParser(
         description=(
-            "Extract Toronto Open Data to Parquet and optionally "
-            "load it with dlt SCD2."
+            "Extract Toronto Open Data to Parquet and optionally load it with dlt SCD2."
         )
     )
     parser.add_argument("--config", type=Path, default=Path("open_data_config.yml"))
@@ -227,9 +226,7 @@ def ingest_source(
             resource = fallbacks[0]
             is_datastore = False
 
-    fingerprint = _fingerprint_for_resource(
-        client, resource, package, probe
-    )
+    fingerprint = _fingerprint_for_resource(client, resource, package, probe)
     freshness = check_freshness(
         resource.get("last_modified") or package.get("metadata_modified"),
         source.expected_cadence,
@@ -240,14 +237,16 @@ def ingest_source(
             logging.WARNING,
             "source_stale",
             source_name=source.name,
-            modified_at=resource.get("last_modified") or package.get("metadata_modified"),
+            modified_at=resource.get("last_modified")
+            or package.get("metadata_modified"),
         )
 
     previous = load_latest_manifest(manifest_root, source.name)
     columns = probe["field_names"] if probe else []
     if columns:
         missing = [
-            column for column in source.required_columns
+            column
+            for column in source.required_columns
             if column.lower() not in {c.lower() for c in columns}
         ]
         if missing:
@@ -275,9 +274,7 @@ def ingest_source(
             "checked_at_utc": started.isoformat(),
             "source_freshness": freshness,
         }
-        _write_manifest(
-            manifest_root / source.name / f"{run_id}.json", manifest
-        )
+        _write_manifest(manifest_root / source.name / f"{run_id}.json", manifest)
         return manifest
 
     output_path = (
@@ -319,9 +316,7 @@ def ingest_source(
 
     columns = utils.actual_columns(output_path)
     drift = detect_schema_drift(columns, previous)
-    warnings = utils.key_quality_warnings(
-        output_path, source.primary_key, source.name
-    )
+    warnings = utils.key_quality_warnings(output_path, source.primary_key, source.name)
     for warning in warnings:
         utils.log_event(logging.WARNING, warning["type"], **warning)
 

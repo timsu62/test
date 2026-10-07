@@ -79,9 +79,8 @@ class TorontoCKANClient:
         )
         response.raise_for_status()
         payload = response.json()
-        if (
-            payload.get("success") is not True
-            or not isinstance(payload.get("result"), dict)
+        if payload.get("success") is not True or not isinstance(
+            payload.get("result"), dict
         ):
             raise RuntimeError(
                 f"CKAN action '{action_name}' returned an invalid result."
@@ -100,9 +99,8 @@ class TorontoCKANClient:
                 return resource
         for wanted in ("csv", "json"):
             for resource in resources:
-                if (
-                    str(resource.get("format", "")).lower() == wanted
-                    and resource.get("url")
+                if str(resource.get("format", "")).lower() == wanted and resource.get(
+                    "url"
                 ):
                     return resource
         raise RuntimeError("No active DataStore, CSV, or JSON resource found.")
@@ -135,8 +133,7 @@ class TorontoCKANClient:
         records = result.get("records", [])
         fields = result.get("fields", [])
         field_schema = [
-            {"id": field.get("id"), "type": field.get("type")}
-            for field in fields
+            {"id": field.get("id"), "type": field.get("type")} for field in fields
         ]
         schema_hash = sha256(
             json.dumps(field_schema, sort_keys=True).encode("utf-8")
@@ -409,4 +406,3 @@ class TorontoCKANClient:
             if found:
                 return
         raise ValueError("JSON fallback did not contain a supported record list.")
-
