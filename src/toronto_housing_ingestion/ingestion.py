@@ -1,4 +1,5 @@
 """Command-line orchestration for Toronto Open Data ingestion."""
+
 from __future__ import annotations
 
 import argparse
