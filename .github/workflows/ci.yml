@@ -27,7 +27,7 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: ruff check .
       - run: ruff format --check .
-      - run: pytest -q --cov=toronto_housing_ingestion --cov-report=term-missing
+      - run: pytest -q --cov=toronto_housing_ingestion --cov-report=term-missing --ignore=tests/integration
       - run: pip-audit
       - run: python -m build
 
@@ -43,7 +43,7 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-      - run: python -m pip install -e ".[duckdb]"
+      - run: python -m pip install -e ".[dev,duckdb]"
       - name: Extract all five configured sources
         run: >-
           toronto-ingest
@@ -53,6 +53,8 @@ jobs:
           --checkpoint-root data/checkpoints
           --lock-file data/.ingestion.lock
           --full-refresh
+      - name: Run SCD2 integration test
+        run: pytest -s -q tests/integration/test_scd2_active_permits.py
       - name: Validate assets
         shell: bash
         run: |
