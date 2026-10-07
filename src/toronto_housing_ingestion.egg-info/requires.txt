@@ -1,0 +1,16 @@
+dlt[duckdb]==1.30.0
+ijson<4,>=3.3
+pandas<3,>=2.2
+pyarrow==25.0.1
+PyYAML<7,>=6
+requests<3,>=2.32
+
+[dev]
+build<2,>=1.6
+pip-audit<3,>=2.9
+pytest<10,>=9
+pytest-cov<8,>=7
+ruff<0.17,>=0.16
+
+[snowflake]
+dlt[snowflake]==1.30.0

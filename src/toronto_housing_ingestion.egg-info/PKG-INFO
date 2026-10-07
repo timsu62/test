@@ -1,0 +1,104 @@
+Metadata-Version: 2.4
+Name: toronto-housing-ingestion
+Version: 0.5.2
+Summary: Simple, configuration-driven ingestion for Toronto Open Data with optional dlt SCD2 loading.
+Requires-Python: <3.15,>=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: dlt[duckdb]==1.30.0
+Requires-Dist: ijson<4,>=3.3
+Requires-Dist: pandas<3,>=2.2
+Requires-Dist: pyarrow==25.0.1
+Requires-Dist: PyYAML<7,>=6
+Requires-Dist: requests<3,>=2.32
+Provides-Extra: snowflake
+Requires-Dist: dlt[snowflake]==1.30.0; extra == "snowflake"
+Provides-Extra: dev
+Requires-Dist: build<2,>=1.6; extra == "dev"
+Requires-Dist: pip-audit<3,>=2.9; extra == "dev"
+Requires-Dist: pytest<10,>=9; extra == "dev"
+Requires-Dist: pytest-cov<8,>=7; extra == "dev"
+Requires-Dist: ruff<0.17,>=0.16; extra == "dev"
+
+# Toronto Housing Ingestion
+
+Simple Python 3.14 ingestion for Toronto Open Data.
+
+The package has four small responsibilities:
+
+1. `ckan_client.py` reads Toronto CKAN DataStore pages and falls back to CSV/JSON files if DataStore fails.
+2. `ingestion.py` selects sources, applies source-specific rules, writes manifests, and optionally calls dlt.
+3. `dlt_loader.py` is the only warehouse-loading module. DuckDB is used locally and in GitHub Actions; Snowflake can replace it later.
+4. `utils.py` contains only filesystem, logging, Parquet, and data-quality helpers.
+
+## Current source rules
+
+All five configured sources are extractable. Active Permits and Cleared Permits are downloaded as full source snapshots. For Active Permits and Cleared Permits, only rows from `APPLICATION_DATE >= 2020-01-01` are sent to the warehouse; the raw Parquet keeps the complete source snapshot.
+
+Their observed natural-key configuration is recorded as `permit_num + revision_num + permit_type`. Duplicate or missing keys are **warnings**. The raw Parquet is still written, but an unsafe SCD2 warehouse load is blocked.
+
+No `revision_type` field is assumed.
+
+## Local setup
+
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+Run checks:
+
+```bash
+ruff check .
+ruff format --check .
+pytest -q --cov=toronto_housing_ingestion --cov-report=term-missing
+pip-audit
+python -m build
+```
+
+Probe sources:
+
+```bash
+toronto-ingest --probe-only
+```
+
+Extract one source:
+
+```bash
+toronto-ingest --source active_permits --full-refresh
+```
+
+Extract multiple sources:
+
+```bash
+toronto-ingest --source active_permits --source cleared_permits --full-refresh
+```
+
+Extract all five sources:
+
+```bash
+toronto-ingest --full-refresh
+```
+
+Load a previously extracted local snapshot for a source whose `warehouse_load` is enabled:
+
+```bash
+toronto-ingest --source active_permits --local-load
+```
+
+## GitHub Actions
+
+Pull requests run tests and packaging checks. Pushes to `main` also run the live five-source extraction and publish two artifacts:
+
+- `toronto-parquet-<run_id>`: the five downloaded Parquet snapshots.
+- `toronto-duckdb-<run_id>`: the generated DuckDB database.
+
+The generated data is intentionally not committed to Git.
+
+## Source-quality behavior
+
+Stale source metadata and duplicate or missing natural keys are warnings. The raw snapshot is still extracted and written. A configured warehouse load is skipped when its key quality is unsafe.
+
+## Why warehouse loading is disabled in the current YAML
+
+The Toronto Active and Cleared Permit source keys have known duplicates. The package therefore preserves the raw data but does not knowingly feed an invalid natural key into SCD2. Enable `warehouse_load` only after the source grain is confirmed to be unique and stable across snapshots.

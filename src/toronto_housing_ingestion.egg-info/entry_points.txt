@@ -1,0 +1,2 @@
+[console_scripts]
+toronto-ingest = toronto_housing_ingestion.ingestion:main

@@ -1,0 +1,127 @@
+ckan:
+  base_url: "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action"
+  timeout_seconds: 120
+  retries: 4
+  page_size: 10000
+
+warehouse:
+  # DuckDB is used locally and in GitHub Actions. Switch this to snowflake in
+  # production and install the project's Snowflake extra.
+  kind: "duckdb"
+  credentials: "data/warehouse/toronto.duckdb"
+  dataset_name: "raw"
+
+sources:
+  active_permits:
+    title: "Building Permits - Active Permits"
+    dataset_slug: "building-permits-active-permits"
+    role: "core"
+    expected_cadence: "daily"
+    portal_url: "https://open.toronto.ca/dataset/building-permits-active-permits/"
+    pagination_sort: "_id asc"
+    min_row_count: 1000
+    max_row_change_percent: 50
+    warehouse_table: "raw_active_permits"
+    # The observed source grain is not currently unique enough for a safe SCD2 load.
+    # Keep extracting the raw data and report the key problem instead.
+    warehouse_load: true
+    primary_key:
+      - "permit_num"
+      - "revision_num"
+      - "permit_type"
+    warehouse_since: "2020-01-01"
+    warehouse_date_column: "APPLICATION_DATE"
+    date_columns:
+      - "APPLICATION_DATE"
+      - "ISSUED_DATE"
+      - "COMPLETED_DATE"
+    type_hints:
+      completed_date:
+        data_type: "timestamp"
+        nullable: true
+    required_columns:
+      - "PERMIT_NUM"
+      - "REVISION_NUM"
+      - "PERMIT_TYPE"
+      - "APPLICATION_DATE"
+      - "ISSUED_DATE"
+      - "STATUS"
+      - "GEO_ID"
+
+  cleared_permits:
+    title: "Building Permits - Cleared Permits"
+    dataset_slug: "building-permits-cleared-permits"
+    role: "core"
+    expected_cadence: "daily"
+    portal_url: "https://open.toronto.ca/dataset/building-permits-cleared-permits/"
+    pagination_sort: "_id asc"
+    min_row_count: 1000
+    max_row_change_percent: 50
+    warehouse_table: "raw_cleared_permits"
+    warehouse_load: false
+    primary_key:
+      - "permit_num"
+      - "revision_num"
+      - "permit_type"
+    warehouse_since: "2020-01-01"
+    warehouse_date_column: "APPLICATION_DATE"
+    date_columns:
+      - "APPLICATION_DATE"
+      - "ISSUED_DATE"
+      - "COMPLETED_DATE"
+    type_hints:
+      completed_date:
+        data_type: "timestamp"
+        nullable: true
+    required_columns:
+      - "PERMIT_NUM"
+      - "REVISION_NUM"
+      - "PERMIT_TYPE"
+      - "APPLICATION_DATE"
+      - "ISSUED_DATE"
+      - "COMPLETED_DATE"
+
+  development_applications:
+    title: "Development Applications"
+    dataset_slug: "development-applications"
+    role: "core"
+    expected_cadence: "daily"
+    portal_url: "https://open.toronto.ca/dataset/development-applications/"
+    pagination_sort: "_id asc"
+    min_row_count: 1000
+    max_row_change_percent: 75
+    warehouse_table: "raw_development_applications"
+    warehouse_load: false
+    primary_key: []
+    required_columns: []
+    date_columns: []
+
+  preliminary_zoning_reviews:
+    title: "Preliminary Zoning Reviews"
+    dataset_slug: "preliminary-zoning-reviews"
+    role: "supporting"
+    expected_cadence: "daily"
+    portal_url: "https://open.toronto.ca/dataset/preliminary-zoning-reviews/"
+    pagination_sort: "_id asc"
+    min_row_count: 1000
+    max_row_change_percent: 75
+    warehouse_table: "raw_preliminary_zoning_reviews"
+    warehouse_load: false
+    primary_key: []
+    required_columns: []
+    date_columns: []
+
+  address_points:
+    title: "Address Points (Municipal) - Toronto One Address Repository"
+    dataset_slug: "address-points-municipal-toronto-one-address-repository"
+    role: "supporting"
+    expected_cadence: "daily"
+    portal_url: "https://open.toronto.ca/dataset/address-points-municipal-toronto-one-address-repository/"
+    pagination_sort: "_id asc"
+    min_row_count: 10000
+    max_row_change_percent: 25
+    warehouse_table: "raw_address_points"
+    warehouse_load: false
+    primary_key: []
+    required_columns: []
+    date_columns: []
