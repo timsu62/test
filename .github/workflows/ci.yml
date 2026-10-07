@@ -124,7 +124,45 @@ jobs:
 
       #- name: Run permit business-key tests
       #  run: python -m pytest -q tests/test_business_keys.py
+      - name: Validate DuckDB contents
+        run: |
+          python - <<'PY'
+          import duckdb
 
+          db = "data/warehouse/toronto.duckdb"
+
+          with duckdb.connect(db, read_only=True) as con:
+              tables = {
+                  row[0]
+                  for row in con.execute(
+                      "SELECT table_name FROM information_schema.tables "
+                      "WHERE table_schema = 'raw'"
+                  ).fetchall()
+              }
+
+              required = {
+                  "raw_active_permits",
+                  "raw_cleared_permits",
+              }
+
+              missing = required - tables
+              if missing:
+                  raise SystemExit(
+                      f"Missing required warehouse tables: {sorted(missing)}"
+                  )
+
+              for table in sorted(required):
+                  count = con.execute(
+                      f"SELECT COUNT(*) FROM {table}"
+                  ).fetchone()[0]
+
+                  if count == 0:
+                      raise SystemExit(
+                          f"Warehouse table {table} is empty."
+                      )
+
+                  print(f"{table}: {count:,} rows")
+          PY
       - name: Upload Parquet assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a0 # v7.0.1
         with:
