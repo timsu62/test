@@ -360,7 +360,11 @@ class TorontoCKANClient:
         row_count = 0
         try:
             frames = (
-                pd.read_csv(temp_path, chunksize=10_000,dtype={"BUILDER_NAME": "string"},)
+                pd.read_csv(
+                    temp_path,
+                    chunksize=10_000,
+                    dtype={"BUILDER_NAME": "string"},
+                )
                 if fmt == "csv"
                 else self._iter_json_frames(temp_path)
             )
