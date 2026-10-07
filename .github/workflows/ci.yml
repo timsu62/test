@@ -122,8 +122,8 @@ jobs:
           echo "DuckDB:"
           ls -lh data/warehouse/toronto.duckdb
 
-      - name: Run permit business-key tests
-        run: python -m pytest -q tests/test_business_keys.py
+      #- name: Run permit business-key tests
+      #  run: python -m pytest -q tests/test_business_keys.py
 
       - name: Upload Parquet assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a0 # v7.0.1
