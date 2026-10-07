@@ -163,6 +163,8 @@ jobs:
 
                   print(f"{table}: {count:,} rows")
           PY
+      - name: Validate permit warehouse loads
+        run: python -m pytest -q tests/test_warehouse_load.py
       - name: Upload Parquet assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a0 # v7.0.1
         with:
