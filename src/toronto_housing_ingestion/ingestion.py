@@ -409,7 +409,7 @@ def ingest_source(
         {
             "status": "success",
             "warehouse_status": "loaded",
-            "warehouse_table": result.table_name,
+            "warehouse_table": source.warehouse_table,
             "warehouse_row_count": result.total_rows,
             "warehouse_current_rows": result.current_rows,
             "duration_seconds": round(time.monotonic() - started_monotonic, 3),
