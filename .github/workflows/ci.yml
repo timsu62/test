@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toronto-housing-ingestion-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q --cov=toronto_housing_ingestion --cov-report=term-missing
+      - run: pip-audit
+      - run: python -m build
+
+  data-assets:
+    name: Extract Toronto data and publish assets
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: python -m pip install -e ".[duckdb]"
+      - name: Extract all five configured sources
+        run: >-
+          toronto-ingest
+          --config open_data_config.yml
+          --raw-root data/raw
+          --manifest-root data/manifests
+          --checkpoint-root data/checkpoints
+          --lock-file data/.ingestion.lock
+          --full-refresh
+      - name: Validate assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find data/raw -type f -name 'data.parquet' | wc -l)" -eq 5
+          test -s data/warehouse/toronto.duckdb
+          for file in $(find data/raw -type f -name 'data.parquet'); do
+            test -s "$file"
+          done
+          echo "Parquet assets:"
+          find data/raw -type f -name 'data.parquet' -print
+          echo "DuckDB:"
+          ls -lh data/warehouse/toronto.duckdb
+      - name: Upload Parquet assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: toronto-parquet-${{ github.run_id }}
+          path: data/raw/**/*.parquet
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload DuckDB asset
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: toronto-duckdb-${{ github.run_id }}
+          path: data/warehouse/toronto.duckdb
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
