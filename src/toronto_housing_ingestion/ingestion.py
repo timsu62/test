@@ -381,7 +381,11 @@ def ingest_source(
         _write_manifest(manifest_path, manifest)
         return manifest
 
-    if warnings:
+    """Removed below logic as it was blocking load to duck
+    as we have duplicates in old data.
+    """
+
+    """if warnings:
         manifest.update(
             {
                 "status": "success",
@@ -392,7 +396,7 @@ def ingest_source(
             }
         )
         _write_manifest(manifest_path, manifest)
-        return manifest
+        return manifest"""
 
     result = load_scd2(
         credentials=app.warehouse_credentials,
