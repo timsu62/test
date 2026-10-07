@@ -360,7 +360,7 @@ class TorontoCKANClient:
         row_count = 0
         try:
             frames = (
-                pd.read_csv(temp_path, chunksize=10_000)
+                pd.read_csv(temp_path, chunksize=10_000,dtype={"BUILDER_NAME": "string"},)
                 if fmt == "csv"
                 else self._iter_json_frames(temp_path)
             )
@@ -393,7 +393,7 @@ class TorontoCKANClient:
             batch: list[dict[str, Any]] = []
             found = False
             with path.open("rb") as file:
-                for record in ijson.items(file, prefix):
+                for record in ijson.items(file, prefix, use_float=True):
                     if not isinstance(record, dict):
                         raise ValueError("JSON fallback records must be objects.")
                     found = True

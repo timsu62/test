@@ -22,8 +22,6 @@ sources:
     min_row_count: 1000
     max_row_change_percent: 50
     warehouse_table: "raw_active_permits"
-    # The observed source grain is not currently unique enough for a safe SCD2 load.
-    # Keep extracting the raw data and report the key problem instead.
     warehouse_load: true
     primary_key:
       - "permit_num"
@@ -58,7 +56,7 @@ sources:
     min_row_count: 1000
     max_row_change_percent: 50
     warehouse_table: "raw_cleared_permits"
-    warehouse_load: false
+    warehouse_load: true
     primary_key:
       - "permit_num"
       - "revision_num"

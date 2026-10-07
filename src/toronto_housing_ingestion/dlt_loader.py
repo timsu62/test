@@ -53,7 +53,6 @@ def ensure_duckdb_database(credentials: str, dataset_name: str) -> None:
 
     db_path = Path(credentials)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    print(credentials)
     dataset = _identifier(dataset_name, "dataset name").lower()
     with duckdb.connect(credentials) as connection:
         connection.execute(f'CREATE SCHEMA IF NOT EXISTS "{dataset}"')
@@ -140,7 +139,6 @@ def load_scd2(
     )
     if destination_kind == "duckdb":
         credentials = str((Path(__file__).resolve().parents[2] / credentials).resolve())
-
     pipeline = dlt.pipeline(
         pipeline_name=f"toronto_{source.name}_scd2",
         destination=_destination(destination_kind, credentials),

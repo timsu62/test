@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: toronto-housing-ingestion
-Version: 0.5.2
+Version: 0.5.4
 Summary: Simple, configuration-driven ingestion for Toronto Open Data with optional dlt SCD2 loading.
 Requires-Python: <3.15,>=3.14
 Description-Content-Type: text/markdown
