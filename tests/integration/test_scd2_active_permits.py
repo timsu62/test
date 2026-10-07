@@ -9,94 +9,128 @@ import pyarrow.parquet as pq
 from toronto_housing_ingestion.config import load_config
 from toronto_housing_ingestion.dlt_loader import load_scd2
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = PROJECT_ROOT / "data" / "raw" / "active_permits"
 
 snapshots = list(SOURCE_DIR.glob("*/*/data.parquet"))
 
 if not snapshots:
-    raise FileNotFoundError(
-        f"No Active Permits snapshot found in {SOURCE_DIR}"
-    )
+    raise FileNotFoundError(f"No Active Permits snapshot found in {SOURCE_DIR}")
 
-SOURCE_FILE = max(snapshots, key=lambda path: path.parent.name)
+SOURCE_FILE = max(
+    snapshots,
+    key=lambda path: path.parent.name,
+)
 
 
 def test_active_permits_scd2(tmp_path):
-    print("\n[1/6] Reading original snapshot...")
-    original = pd.read_parquet(SOURCE_FILE)
-    print(f"    rows: {len(original):,}")
+    print("\n[1/6] Reading 10 records from the 2020+ snapshot...")
+
+    source_table = pq.read_table(SOURCE_FILE)
+    source_df = source_table.to_pandas()
+
+    source_df = (
+        source_df[
+            pd.to_datetime(
+                source_df["APPLICATION_DATE"],
+                errors="coerce",
+            )
+            >= pd.Timestamp("2020-01-01")
+        ]
+        .head(10)
+        .copy()
+    )
+
+    assert len(source_df) == 10, (
+        f"Test setup failed: expected 10 rows, got {len(source_df)}"
+    )
+
+    print(f"    rows: {len(source_df)}")
 
     print("[2/6] Creating changed snapshot...")
 
-    updated = original.copy()
+    updated = source_df.copy()
 
     # Change one existing permit.
-    changed_id = updated.loc[updated.index[0], "_id"]
-    updated.loc[updated.index[0], "permit_type"] = "SCD2_TEST_CHANGED"
+    changed_id = int(updated.iloc[0]["_id"])
+    original_permit_type = updated.iloc[0]["PERMIT_TYPE"]
+
+    updated.loc[updated.index[0], "PERMIT_TYPE"] = f"{original_permit_type}_SCD2_TEST"
+
+    assert updated.iloc[0]["PERMIT_TYPE"] != original_permit_type, (
+        "Test setup failed: permit_type did not actually change"
+    )
 
     # Delete one permit.
-    deleted_id = updated.loc[updated.index[1], "_id"]
+    deleted_id = int(updated.iloc[1]["_id"])
     updated = updated.drop(updated.index[1])
 
     # Insert one new permit.
     new_row = updated.iloc[0].copy()
-
-    if pd.api.types.is_integer_dtype(updated["_id"]):
-        new_id = int(updated["_id"].max()) + 1_000_000
-    else:
-        new_id = "SCD2_TEST_NEW"
-
+    new_id = int(updated["_id"].max()) + 1_000_000
     new_row["_id"] = new_id
+    new_row["PERMIT_TYPE"] = "SCD2_TEST_INSERTED"
 
     updated = pd.concat(
         [updated, pd.DataFrame([new_row])],
         ignore_index=True,
     )
 
+    # Preserve the original Arrow schema and avoid pandas index columns.
+    updated_table = pa.Table.from_pandas(
+        updated,
+        schema=source_table.schema,
+        preserve_index=False,
+        safe=False,
+    )
+
+    original_file = tmp_path / "original.parquet"
     updated_file = tmp_path / "updated.parquet"
     database = tmp_path / "test.duckdb"
 
     pq.write_table(
-        pa.Table.from_pandas(updated, preserve_index=False),
-        updated_file,
+        pa.Table.from_pandas(
+            source_df,
+            schema=source_table.schema,
+            preserve_index=False,
+            safe=False,
+        ),
+        original_file,
     )
 
-    print(f"    original rows: {len(original):,}")
-    print(f"    updated rows:  {len(updated):,}")
-    print("    changed: 1 permit")
-    print("    deleted: 1 permit")
-    print("    inserted: 1 permit")
+    pq.write_table(updated_table, updated_file)
+
+    print("    changed: 1")
+    print("    deleted: 1")
+    print("    inserted: 1")
 
     config = load_config(PROJECT_ROOT / "open_data_config.yml")
 
     source = next(
-        source
-        for source in config.sources
-        if source.name == "active_permits"
+        source for source in config.sources if source.name == "active_permits"
     )
 
-    # Temporary key used only to test SCD2 mechanics.
+    # Temporary technical key used only to test SCD2 mechanics.
     source = replace(
         source,
         warehouse_load=True,
         primary_key=("_id",),
-        warehouse_since=None,
-        warehouse_date_column=None,
     )
 
     print("[3/6] Loading original snapshot...")
+
     load_scd2(
         credentials=str(database),
-        snapshot_path=SOURCE_FILE,
+        snapshot_path=original_file,
         source=source,
         dataset_name="raw",
         destination_kind="duckdb",
     )
+
     print("    original snapshot loaded")
 
     print("[4/6] Loading changed snapshot...")
+
     load_scd2(
         credentials=str(database),
         snapshot_path=updated_file,
@@ -104,9 +138,11 @@ def test_active_permits_scd2(tmp_path):
         dataset_name="raw",
         destination_kind="duckdb",
     )
+
     print("    changed snapshot loaded")
 
     print("[5/6] Reloading unchanged snapshot...")
+
     load_scd2(
         credentials=str(database),
         snapshot_path=updated_file,
@@ -114,6 +150,7 @@ def test_active_permits_scd2(tmp_path):
         dataset_name="raw",
         destination_kind="duckdb",
     )
+
     print("    unchanged snapshot reloaded")
 
     print("[6/6] Validating SCD2 history...")
@@ -140,6 +177,15 @@ def test_active_permits_scd2(tmp_path):
             [changed_id],
         ).fetchone()[0]
 
+        deleted_versions = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM raw.raw_active_permits
+            WHERE _id = ?
+            """,
+            [deleted_id],
+        ).fetchone()[0]
+
         deleted_current = connection.execute(
             """
             SELECT COUNT(*)
@@ -150,7 +196,7 @@ def test_active_permits_scd2(tmp_path):
             [deleted_id],
         ).fetchone()[0]
 
-        new_versions = connection.execute(
+        inserted_versions = connection.execute(
             """
             SELECT COUNT(*)
             FROM raw.raw_active_permits
@@ -159,28 +205,41 @@ def test_active_permits_scd2(tmp_path):
             [new_id],
         ).fetchone()[0]
 
-    print(f"    total rows: {total:,}")
-    print(f"    current rows: {current:,}")
+    print(f"    total historical rows: {total}")
+    print(f"    current rows: {current}")
     print(f"    changed permit versions: {changed_versions}")
-    print(f"    deleted permit current versions: {deleted_current}")
-    print(f"    inserted permit versions: {new_versions}")
+    print(f"    deleted permit versions: {deleted_versions}")
+    print(f"    deleted current versions: {deleted_current}")
+    print(f"    inserted permit versions: {inserted_versions}")
 
-    original_rows = len(original)
+    # 10 original rows
+    # +1 new version for the changed row
+    # +1 inserted row
+    # = 12 historical rows.
+    assert total == 12, (
+        f"SCD2 history incorrect: expected 12, got {total}. "
+        f"changed={changed_versions}, "
+        f"deleted={deleted_versions}, "
+        f"inserted={inserted_versions}"
+    )
 
-    assert total == original_rows + 1
-    assert current == original_rows
-    assert changed_versions == 2
-    assert deleted_current == 0
-    assert new_versions == 1
+    # 9 original permits remain current + 1 inserted permit.
+    assert current == 10, f"Current-row count incorrect: expected 10, got {current}"
+
+    assert changed_versions == 2, (
+        f"Changed permit should have 2 versions, got {changed_versions}"
+    )
+
+    assert deleted_versions == 1, (
+        f"Deleted permit should retain 1 historical version, got {deleted_versions}"
+    )
+
+    assert deleted_current == 0, (
+        f"Deleted permit should have 0 current versions, got {deleted_current}"
+    )
+
+    assert inserted_versions == 1, (
+        f"Inserted permit should have 1 version, got {inserted_versions}"
+    )
 
     print("    SCD2 validation passed")
-
-"""
-Run it with:
-
-```bash
-pytest -s -q tests/integration/test_scd2_active_permits.py
-```
-
-The `-s` is important because it allows the progress messages and dlt's progress output to appear in the terminal.
-"""
